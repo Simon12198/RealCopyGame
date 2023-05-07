@@ -1,0 +1,4 @@
+player idle 40;7;7;20
+player run 7;7;7;7;7;7
+player jump 1
+player fall 1
