@@ -1,0 +1,164 @@
+Index: ComSciGame-main/level_map.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ComSciGame-main/level_map.py	(revision 0f99ccfb09ae27e7a4e9397fd69742e120ebbf4b)
++++ ComSciGame-main/level_map.py	(revision fede9cd970167d379ebd972c34ac24e4e4228da0)
+@@ -26,6 +26,7 @@
+     def __init__(self, size, loc, img):
+         super().__init__(size, loc)
+         self.image = img
++        self.mask = pygame.mask.from_surface(img)
+ 
+ class Level:
+     def __init__(self, game_map, path, surface):
+@@ -116,16 +117,17 @@
+         self.scroll[0] = int(self.scroll[0])
+         self.scroll[1] = int(self.scroll[1])
+ 
+-    def check_slope_collision(self, player, slopes):
++    def check_slope_collision(self):
+         player = self.player.sprite
+         player.x = player.rect.x
+         player.x += player.movement[0]
+         player.rect.x = int(player.x)
+-        self.collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}
++        #self.collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}
+         for slopes in self.slopesgroup.sprites():
+             if slopes.rect.colliderect(player.rect):
+                 offset = (slopes.rect.left - player.rect.left, slopes.rect.top - player.rect.top)
+-                return self.player_mask.overlap(self.slopes_mask, offset)
++                return player.mask.overlap(slopes.mask, offset)
++        return False
+ 
+ 
+     def collision_movement(self):
+@@ -227,3 +229,10 @@
+         self.player.update(self.scroll)
+         self.player.draw(self.surface)
+         self.collision_movement()
++
++        #collision_types_backup = self.collision_types
++        intersection_point = self.check_slope_collision()
++        print("Slope collision check = " + str(intersection_point))
++        #if intersection_point:
++
++        #self.collision_types = collision_types_backup
+Index: ComSciGame-main/player.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ComSciGame-main/player.py	(revision 0f99ccfb09ae27e7a4e9397fd69742e120ebbf4b)
++++ ComSciGame-main/player.py	(revision fede9cd970167d379ebd972c34ac24e4e4228da0)
+@@ -1,7 +1,6 @@
+ import pygame, os, math
+ from animation import load_animations
+ 
+-
+ def flip(img, boolean):
+     pygame.transform.flip(img, boolean, False)
+ 
+@@ -26,7 +25,8 @@
+         self.image = self.animations[self.action][self.anim[self.frame]]
+         self.rect = self.image.get_rect(topleft = loc)
+ 
+-
++        self.mask = pygame.mask.from_surface(self.image.convert_alpha())
++        self.DEBUG = False
+ 
+         #player movement
+         self.x = loc[0]
+@@ -44,24 +44,48 @@
+ 
+         self.movement = [0, 0]
+         self.keys = pygame.key.get_pressed()
+-        if self.keys[pygame.K_RIGHT]:
++        if self.keys[pygame.K_d]:
++            self.DEBUG = True
++        if self.keys[pygame.K_f]:
++            self.DEBUG = False
++
++        if self.DEBUG:
++            if self.keys[pygame.K_RIGHT]:
++
++                self.movement[0] += 1
++                self.direction = [True, False]
++                self.flip = False
++
++            elif self.keys[pygame.K_LEFT]:
++                self.movement[0] -= 1
++                self.direction = [False, True]
++                self.flip = True
++
++            if self.keys[pygame.K_UP]:
++                self.movement[1] = -1
++
++            if self.keys[pygame.K_DOWN]:
++                self.movement[1] = 1
++        else:
++            self.keys = pygame.key.get_pressed()
++            if self.keys[pygame.K_RIGHT]:
+ 
+-            self.movement[0] += 3
+-            self.direction = [True, False]
+-            self.flip = False
+-            if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
+-                self.movement[0] += 1
+-        elif self.keys[pygame.K_LEFT]:
+-            self.movement[0] -= 3
+-            self.direction = [False, True]
+-            self.flip = True
+-            if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
+-                self.movement[0] -= 1
+-        else:
+-            self.direction = [False, False]
+-        if self.keys[pygame.K_SPACE]:
+-            if self.air_timer < 6:
+-                self.vertical_momentum = -4
++                self.movement[0] += 3
++                self.direction = [True, False]
++                self.flip = False
++                if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
++                    self.movement[0] += 1
++            elif self.keys[pygame.K_LEFT]:
++                self.movement[0] -= 3
++                self.direction = [False, True]
++                self.flip = True
++                if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
++                    self.movement[0] -= 1
++            else:
++                self.direction = [False, False]
++            if self.keys[pygame.K_SPACE]:
++                if self.air_timer < 6:
++                    self.vertical_momentum = -4
+ 
+     def gravity(self):
+         self.gravity_multiplier = 0.2
+@@ -103,6 +127,7 @@
+         image = self.animations[self.action][self.anim[self.frame]]
+         self.image = pygame.transform.flip(image, self.flip, False)
+ 
++
+     def status(self):
+         if self.movement[1] < 0:
+             self.change_action('jump')
+@@ -121,7 +146,8 @@
+     def update(self, scroll):
+         self.get_input()
+         # gravity
+-        self.gravity()
++        if not self.DEBUG:
++            self.gravity()
+         self.movement[1] += self.vertical_momentum
+ 
+ 
+@@ -129,6 +155,7 @@
+         self.rect.y -= scroll[1]
+ 
+         self.implement_anim(True)
++        self.mask = pygame.mask.from_surface(self.image.convert_alpha())
+         self.status()
+ 
+ 
