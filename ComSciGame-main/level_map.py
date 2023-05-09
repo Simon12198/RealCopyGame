@@ -26,8 +26,12 @@ class ground_tile(Tiles):
     def __init__(self, size, loc, img):
         super().__init__(size, loc)
         self.image = img
+        self.mask = pygame.mask.from_surface(img)
+
 
 class Level:
+
+
     def __init__(self, game_map, path, surface):
         self.game_map = game_map
         self.surface = surface
@@ -39,6 +43,8 @@ class Level:
         self.coin = pygame.sprite.Group()
         self.Death = pygame.sprite.Group()
         self.slopesgroup = pygame.sprite.Group()
+        self.player_on_slope = False
+        self.bg_imgs = pygame.sprite.Group()
 
         self.terrain_layout = import_csv_files(self.game_map['Grass'])
         self.terrain_sprites = self.create_sprite(self.terrain_layout, 'Grass')
@@ -100,6 +106,8 @@ class Level:
                         ramps = slope_layout[int(col)]
                         sprited = ground_tile(tile_size, [col_index * 32, row_index * 32], ramps)
                         self.slopesgroup.add(sprited)
+                     #  self.slope.types = ['topslopeleft', 'topsloperight','leftsteep','leftlong','rightsteep','rightlong']
+                     #topsloperight id = 40, topsloperight = 42, left steep = 6, 14 left long = 20,21,29, right steep = 7, 15, rightlong = 22, 23, 30
 
                 col_index += 1
 
@@ -116,16 +124,17 @@ class Level:
         self.scroll[0] = int(self.scroll[0])
         self.scroll[1] = int(self.scroll[1])
 
-    def check_slope_collision(self, player, slopes):
+    def check_slope_collision(self):
         player = self.player.sprite
         player.x = player.rect.x
         player.x += player.movement[0]
         player.rect.x = int(player.x)
-        self.collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}
+        #self.collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}
         for slopes in self.slopesgroup.sprites():
             if slopes.rect.colliderect(player.rect):
                 offset = (slopes.rect.left - player.rect.left, slopes.rect.top - player.rect.top)
-                return self.player_mask.overlap(self.slopes_mask, offset)
+                return player.mask.overlap(slopes.mask, offset)
+        return False
 
 
     def collision_movement(self):
@@ -142,6 +151,29 @@ class Level:
                 if player.movement[0] < 0:
                     player.rect.left = tile.rect.right
                     self.collision_types['left'] = True
+        for slopes in self.slopesgroup.sprites():
+            TOP, WALKABLE = 0, 1
+            slope_type = TOP
+            if slopes.rect.colliderect(player.rect):
+                if pygame.sprite.collide_mask(player, slopes):
+                    if slopes.rect.top < player.rect.top and slope_type == TOP:
+                        player.rect.top = slopes.rect.bottom
+                        self.player_on_slope = True
+                        player.vertical_momentum = 0
+                    elif player.rect.bottom > slopes.rect.top > player.rect.top and self.player_on_slope == False:
+                        player.rect.bottom = slopes.rect.top
+                        self.player_on_slope = True
+                    elif player.rect.left < slopes.rect.right < player.rect.right and self.player_on_slope == True:
+                        player.rect.bottomleft = slopes.rect.topright
+                        self.player_on_slope = False
+                    elif player.rect.bottomright == slopes.rect.midleft and self.player_on_slope == True:
+                        player.rect.bottomright = slopes.rect.topleft
+                        self.player_on_slope = False
+            else:
+                self.player_on_slope = False
+
+
+
 
         for coin in self.coin.sprites():
             if coin.rect.colliderect(player.rect):
@@ -204,10 +236,27 @@ class Level:
         player = self.player.sprite
         player.jump_held = False
 
+    def draw_bg(self):
+
+        bg_images = []
+        for i in range(1, 6):
+            for image in ['data/graphics/bg_images/plx-1.png', 'data/graphics/bg_images/plx-2.png',
+                          'data/graphics/bg_images/plx-3.png', 'data/graphics/bg_images/plx-4.png',
+                          'data/graphics/bg_images/plx-5.png']:
+                bg_image = pygame.image.load(image).convert_alpha()
+                bg_imagenew = pygame.transform.scale(bg_image, (rescaled_width, rescaled_height))
+                bg_images.append(bg_imagenew)
+        bg_width = bg_images[0].get_width()
+        for x in range(5):
+            bg_speed = 1
+            for i in bg_images:
+                self.surface.blit(i, ((x * bg_width) - 1.2 * bg_speed, 0))
+                bg_speed += 0.2
+
     def run(self):
         # tiles
         self.scrolling()
-
+        #background drawing
         self.tiles.update(self.scroll)
         self.tiles.draw(self.surface)
         self.slopesgroup.update(self.scroll)
@@ -227,3 +276,13 @@ class Level:
         self.player.update(self.scroll)
         self.player.draw(self.surface)
         self.collision_movement()
+
+
+
+
+
+ #       collision_types_backup = self.collision_types
+  #      intersection_point = self.check_slope_collision()
+      #  print(intersection_point)
+    #    if intersection_point:
+   #        self.collision_types = collision_types_backup

@@ -1,7 +1,6 @@
 import pygame, sys  # import pygame and sys
 import button
 from level_map import Level
-from pygame.locals import *  # import pygame modules
 pygame.init()  # initiate pygame
 clock = pygame.time.Clock()  # set up the clock
 pygame.display.set_caption('Fatal Echo')  # set the window name
@@ -17,7 +16,7 @@ screen = pygame.display.set_mode(WINDOW_SIZE, 0, 32)  # initiate screen
 display = pygame.Surface((rescaled_width, rescaled_height))
 # define colours
 TEXT_COL = (255, 255, 255)
-WHITE = (255 , 255, 255)
+WHITE = (255, 255, 255)
 BGCOLOUR = (0, 128, 255)
 PURPLEBG = (85, 0, 149)
 LBLUE = (0, 163, 233)
@@ -62,11 +61,13 @@ def logo(img, x, y):
     screen.blit(img, (x,y))
 menu_mode = "main"
 clicked = False
-time = 2000
+time = 3500
 screenswitch = pygame.USEREVENT + 0
 finished_switch = pygame.USEREVENT + 1
 pygame.time.set_timer(finished_switch, time)
 pygame.time.set_timer(screenswitch, time)
+
+
 
 level = Level([], 'data/levels/level_3/', display)
 
@@ -78,18 +79,18 @@ while True:
             state = STARTSCREEN
         if e.type == finished_switch:
             screenswitch = 0
-        if e.type == QUIT:
+        if e.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
-        if e.type == KEYDOWN:
-            if e.key == K_SPACE:
+        if e.type == pygame.KEYDOWN:
+            if e.key == pygame.K_SPACE:
                 level.button_held()
-            if e.key == K_ESCAPE and state == RUNNING:
+            if e.key == pygame.K_ESCAPE and state == RUNNING:
                 state = PAUSE
-            if e.key == K_ESCAPE and state == EASTEREGG:
+            if e.key == pygame.K_ESCAPE and state == EASTEREGG:
                 state = EEPAUSE
-            if e.type == KEYUP:
-                if e.key == K_SPACE:
+            if e.type == pygame.KEYUP:
+                 if e.key == pygame.K_SPACE:
                     level.button_released()
             if state == STARTSCREEN:
                 if pygame.key.get_pressed():
@@ -99,7 +100,6 @@ while True:
 
     else:
         if state == RUNNING:
-            display.fill('red')
             level.run()
             screen.blit(pygame.transform.scale(display, WINDOW_SIZE), (0, 0))
             pygame.display.update()  # update the screen

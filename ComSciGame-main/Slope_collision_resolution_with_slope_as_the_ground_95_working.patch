@@ -1,0 +1,111 @@
+Index: PygameProject/ComSciGame-main/level_map.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- PygameProject/ComSciGame-main/level_map.py	(revision ec59d275e35733b3ac5d22f7b7c8fc3273e6d33a)
++++ PygameProject/ComSciGame-main/level_map.py	(revision 892896c663998a353a56f08950a871ab25d4ba66)
+@@ -139,6 +139,7 @@
+         player.x = player.rect.x
+         player.x += player.movement[0]
+         player.rect.x = int(player.x)
++
+         self.collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}
+         for tile in self.tiles.sprites():
+             if tile.rect.colliderect(player.rect):
+@@ -148,26 +149,46 @@
+                 if player.movement[0] < 0:
+                     player.rect.left = tile.rect.right
+                     self.collision_types['left'] = True
+-        for slopes in self.slopesgroup.sprites():
+-            TOP, WALKABLE = 0, 1
+-            slope_type = TOP
+-            if slopes.rect.colliderect(player.rect):
+-                if pygame.sprite.collide_mask(player, slopes):
+-                    if slopes.rect.top < player.rect.top and slope_type == TOP:
+-                        player.rect.top = slopes.rect.bottom
++
++        player.y = player.rect.y
++        player.y += player.movement[1]
++        player.rect.y = int(player.y)
++
++        maxVerticalOffset = 0  # in cases where player collides with multiple slopes at once, we should move him by maximum required amount, otherwise he'll be moved up next frame. Less jitter
++        for slope in self.slopesgroup.sprites():
++            if slope.rect.colliderect(player.rect):
++                offset = (slope.rect.left - player.rect.left, slope.rect.top - player.rect.top-1)
++                almostCollisionOffset = player.mask.overlap(slope.mask, offset)  # if not None: player is exactly 1 pixel above slope, aka touching the slope, without being inside of it
++                realCollisionOffset = pygame.sprite.collide_mask(player, slope)  # if not None: Player has at least 1 pixel inside the slope
++
++                if almostCollisionOffset:
++                    self.collision_types['bottom'] = True  # remove vertical momentum
++
++                if realCollisionOffset:
++                    verticalOffset = player.rect.height - realCollisionOffset[1]  # move the player by this amount, and he'll be touching the current ground tile without being inside of it
++                    if verticalOffset > maxVerticalOffset:
++                        maxVerticalOffset = verticalOffset
++                    self.collision_types['bottom'] = True
++
++        if maxVerticalOffset:
++            player.rect.bottom -= maxVerticalOffset
++
++        '''
++                    if slope.rect.top < player.rect.top and slope_type == TOP:
++                        player.rect.top = slope.rect.bottom
+                         self.player_on_slope = True
+                         player.vertical_momentum = 0
+-                    elif player.rect.bottom > slopes.rect.top > player.rect.top and self.player_on_slope == False:
+-                        player.rect.bottom = slopes.rect.top
++                    elif player.rect.bottom > slope.rect.top > player.rect.top and self.player_on_slope == False:
++                        player.rect.bottom = slope.rect.top
+                         self.player_on_slope = True
+-                    elif player.rect.left < slopes.rect.right < player.rect.right and self.player_on_slope == True:
+-                        player.rect.bottomleft = slopes.rect.topright
++                    elif player.rect.left < slope.rect.right < player.rect.right and self.player_on_slope == True:
++                        player.rect.bottomleft = slope.rect.topright
+                         self.player_on_slope = False
+-                    elif player.rect.bottomright == slopes.rect.midleft and self.player_on_slope == True:
+-                        player.rect.bottomright = slopes.rect.topleft
++                    elif player.rect.bottomright == slope.rect.midleft and self.player_on_slope == True:
++                        player.rect.bottomright = slope.rect.topleft
+                         self.player_on_slope = False
+             else:
+-                self.player_on_slope = False
++                self.player_on_slope = False'''
+ 
+ 
+ 
+@@ -199,9 +220,7 @@
+                 self.create_sprite(self.spawn, 'Spawn')
+                 self.create_sprite(self.death, 'Death')
+ 
+-        player.y = player.rect.y
+-        player.y += player.movement[1]
+-        player.rect.y = int(player.y)
++
+         for tile in self.tiles.sprites():
+             if tile.rect.colliderect(player.rect):
+                 if player.movement[1] > 0:
+Index: PygameProject/ComSciGame-main/player.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- PygameProject/ComSciGame-main/player.py	(revision ec59d275e35733b3ac5d22f7b7c8fc3273e6d33a)
++++ PygameProject/ComSciGame-main/player.py	(revision 892896c663998a353a56f08950a871ab25d4ba66)
+@@ -51,7 +51,6 @@
+ 
+         if self.DEBUG:
+             if self.keys[pygame.K_RIGHT]:
+-
+                 self.movement[0] += 1
+                 self.direction = [True, False]
+                 self.flip = False
+@@ -155,7 +154,7 @@
+         self.rect.y -= scroll[1]
+ 
+         self.implement_anim(True)
+-        self.mask = pygame.mask.from_surface(self.image.convert_alpha())
++        #self.mask = pygame.mask.from_surface(self.image.convert_alpha())
+         self.status()
+ 
+ 
