@@ -1,0 +1,535 @@
+Index: ComSciGame-main/level_map.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>from player import Player\r\nfrom player import *\r\nfrom csv_loader import *\r\n\r\ntile_size = 32\r\n\r\nSCREEN_WIDTH = 1200\r\nscreen_height = 640\r\n\r\nrescaled_width = 600\r\nrescaled_height = 320\r\n\r\n\r\nclass Tiles(pygame.sprite.Sprite):\r\n    def __init__(self, size, loc):\r\n        super().__init__()\r\n        self.image = pygame.Surface((size, size))\r\n        self.rect = self.image.get_rect(topleft=loc)\r\n\r\n    def update(self, scroll):\r\n        self.rect.x -= scroll[0]\r\n        self.rect.y -= scroll[1]\r\n\r\n\r\nclass ground_tile(Tiles):\r\n    def __init__(self, size, loc, img):\r\n        super().__init__(size, loc)\r\n        self.image = img\r\n\r\nclass Level:\r\n    def __init__(self, game_map, path, surface):\r\n        self.game_map = game_map\r\n        self.surface = surface\r\n        self.game_map = self.load_map(path)\r\n\r\n        self.player = pygame.sprite.GroupSingle()\r\n        self.tiles = pygame.sprite.Group()\r\n        self.bg_objects = pygame.sprite.Group()\r\n        self.coin = pygame.sprite.Group()\r\n        self.Death = pygame.sprite.Group()\r\n        self.slopesgroup = pygame.sprite.Group()\r\n\r\n        self.terrain_layout = import_csv_files(self.game_map['Grass'])\r\n        self.terrain_sprites = self.create_sprite(self.terrain_layout, 'Grass')\r\n\r\n        self.Gold = import_csv_files(self.game_map['Gold'])\r\n        self.create_sprite(self.Gold, 'Gold')\r\n\r\n        self.trees = import_csv_files(self.game_map['Trees'])\r\n        self.create_sprite(self.trees, 'Trees')\r\n\r\n        self.slope_layout = import_csv_files(self.game_map['Slopes'])\r\n        self.slope_sprites = self.create_sprite(self.slope_layout, 'Slopes')\r\n\r\n        self.spawn = import_csv_files(self.game_map['Spawn'])\r\n        self.create_sprite(self.spawn, 'Spawn')\r\n\r\n        self.death = import_csv_files(self.game_map['Death'])\r\n        self.create_sprite(self.death, 'Death')\r\n\r\n    def load_map(self, path):\r\n        level_data = {}\r\n        f = open(path + 'level', 'r')\r\n        self.level = f.read()\r\n        f.close()\r\n        self.level = self.level.split('\\n')\r\n        for name in self.level:\r\n            paths = path.split('/')\r\n            level_name = paths[2]\r\n            level_data[name] = path + level_name + '_' + name + '.csv'\r\n        return (level_data)\r\n\r\n    def create_sprite(self, layout, type):\r\n\r\n        row_index = 0\r\n        for row in layout:\r\n            col_index = 0\r\n            for col in row:\r\n                if col != '-1':\r\n                    if type == 'Grass':\r\n                        terrain_layout = slicing_tiles('data/graphics/Terrain/Grass/Grass.png')\r\n                        tile = terrain_layout[int(col)]\r\n                        sprite = ground_tile(tile_size, [col_index * 32, row_index * 32], tile)\r\n                        self.tiles.add(sprite)\r\n                    if type == 'Gold':\r\n                        gold = slicing_tiles('data/graphics/Terrain/Coin/gold_coin.png')\r\n                        tiles = gold[int(col)]\r\n                        sprite = ground_tile(tile_size, [col_index * 32, row_index * 32], tiles)\r\n                        self.coin.add(sprite)\r\n                    if type == 'Death':\r\n                        death = slicing_tiles('data/graphics/Terrain/Death/Death.png')\r\n                        tileset = death[int(col)]\r\n                        sprite = ground_tile(tile_size, [col_index * 32, row_index * 32], tileset)\r\n                        self.Death.add(sprite)\r\n                    if type == 'Spawn':\r\n                        player = Player([col_index * 32, row_index * 32])\r\n                        self.player.add(player)\r\n                    if type == 'Slopes':\r\n                        slope_layout = slicing_tiles('data/graphics/Terrain/Slopes/Slopes.png')\r\n                        ramps = slope_layout[int(col)]\r\n                        sprited = ground_tile(tile_size, [col_index * 32, row_index * 32], ramps)\r\n                        self.slopesgroup.add(sprited)\r\n\r\n                col_index += 1\r\n\r\n            row_index += 1\r\n        self.tile_sprites = self.tiles.sprites()\r\n        self.slope_sprite = self.slopesgroup.sprites()\r\n\r\n    def scrolling(self):\r\n        player = self.player.sprite\r\n        true_scroll = [0, 0]\r\n        true_scroll[0] += (player.rect.x - true_scroll[0] - rescaled_width // 2) / 15\r\n        true_scroll[1] += (player.rect.y - true_scroll[1] - rescaled_height // 2) / 15\r\n        self.scroll = true_scroll.copy()\r\n        self.scroll[0] = int(self.scroll[0])\r\n        self.scroll[1] = int(self.scroll[1])\r\n\r\n    def check_slope_collision(self, player, slopes):\r\n        player = self.player.sprite\r\n        player.x = player.rect.x\r\n        player.x += player.movement[0]\r\n        player.rect.x = int(player.x)\r\n        self.collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}\r\n        for slopes in self.slopesgroup.sprites():\r\n            if slopes.rect.colliderect(player.rect):\r\n                offset = (slopes.rect.left - player.rect.left, slopes.rect.top - player.rect.top)\r\n                return self.player_mask.overlap(self.slopes_mask, offset)\r\n\r\n\r\n    def collision_movement(self):\r\n        player = self.player.sprite\r\n        player.x = player.rect.x\r\n        player.x += player.movement[0]\r\n        player.rect.x = int(player.x)\r\n        self.collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}\r\n        for tile in self.tiles.sprites():\r\n            if tile.rect.colliderect(player.rect):\r\n                if player.movement[0] > 0:\r\n                    player.rect.right = tile.rect.left\r\n                    self.collision_types['right'] = True\r\n                if player.movement[0] < 0:\r\n                    player.rect.left = tile.rect.right\r\n                    self.collision_types['left'] = True\r\n\r\n        for coin in self.coin.sprites():\r\n            if coin.rect.colliderect(player.rect):\r\n                self.coin.remove(coin)\r\n\r\n        for death in self.Death.sprites():\r\n            if death.rect.colliderect(player.rect):\r\n                self.player = pygame.sprite.GroupSingle().empty()\r\n                self.tiles = pygame.sprite.Group().empty()\r\n                self.bg_objects = pygame.sprite.Group().empty()\r\n                self.coin = pygame.sprite.Group().empty()\r\n                self.Death = pygame.sprite.Group().empty()\r\n                self.slopesgroup = pygame.sprite.Group().empty()\r\n\r\n                self.player = pygame.sprite.GroupSingle()\r\n                self.tiles = pygame.sprite.Group()\r\n                self.bg_objects = pygame.sprite.Group()\r\n                self.coin = pygame.sprite.Group()\r\n                self.Death = pygame.sprite.Group()\r\n                self.slopesgroup = pygame.sprite.Group()\r\n\r\n                self.terrain_sprites = self.create_sprite(self.terrain_layout, 'Grass')\r\n                self.slope_sprites = self.create_sprite(self.slope_layout, 'Slopes')\r\n                self.create_sprite(self.Gold, 'Gold')\r\n                self.create_sprite(self.trees, 'Trees')\r\n                self.create_sprite(self.spawn, 'Spawn')\r\n                self.create_sprite(self.death, 'Death')\r\n\r\n        player.y = player.rect.y\r\n        player.y += player.movement[1]\r\n        player.rect.y = int(player.y)\r\n        for tile in self.tiles.sprites():\r\n            if tile.rect.colliderect(player.rect):\r\n                if player.movement[1] > 0:\r\n                    player.rect.bottom = tile.rect.top\r\n                    self.collision_types['bottom'] = True\r\n                if player.movement[1] < 0:\r\n                    player.rect.top = tile.rect.bottom\r\n                    self.collision_types['top'] = True\r\n\r\n        for coin in self.coin.sprites():\r\n            if coin.rect.colliderect(player.rect):\r\n                self.coin.remove(coin)\r\n        if self.collision_types['bottom']:\r\n            player.collide_bottom = True\r\n            player.air_timer = 0\r\n            player.vertical_momentum = 0\r\n        else:\r\n            player.collide_bottom = False\r\n            player.air_timer += 1\r\n\r\n        if self.collision_types['top']:\r\n            player.vertical_momentum = 0\r\n\r\n    def button_held(self):\r\n        player = self.player.sprite\r\n        player.jump_held = True\r\n\r\n    def button_released(self):\r\n        player = self.player.sprite\r\n        player.jump_held = False\r\n\r\n    def run(self):\r\n        # tiles\r\n        self.scrolling()\r\n\r\n        self.tiles.update(self.scroll)\r\n        self.tiles.draw(self.surface)\r\n        self.slopesgroup.update(self.scroll)\r\n        self.slopesgroup.draw(self.surface)\r\n\r\n        self.bg_objects.update(self.scroll)\r\n        self.bg_objects.draw(self.surface)\r\n\r\n        self.coin.update(self.scroll)\r\n        self.coin.draw(self.surface)\r\n\r\n        self.Death.update(self.scroll)\r\n\r\n        # player\r\n        player = self.player.sprite\r\n\r\n        self.player.update(self.scroll)\r\n        self.player.draw(self.surface)\r\n        self.collision_movement()\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/ComSciGame-main/level_map.py b/ComSciGame-main/level_map.py
+--- a/ComSciGame-main/level_map.py	(revision c375b27411eee050f75599ca26e529edab59e3a2)
++++ b/ComSciGame-main/level_map.py	(date 1683593185695)
+@@ -26,6 +26,8 @@
+     def __init__(self, size, loc, img):
+         super().__init__(size, loc)
+         self.image = img
++        self.mask = pygame.mask.from_surface(img)
++
+ 
+ class Level:
+     def __init__(self, game_map, path, surface):
+@@ -39,6 +41,7 @@
+         self.coin = pygame.sprite.Group()
+         self.Death = pygame.sprite.Group()
+         self.slopesgroup = pygame.sprite.Group()
++        self.player_on_slope = False
+ 
+         self.terrain_layout = import_csv_files(self.game_map['Grass'])
+         self.terrain_sprites = self.create_sprite(self.terrain_layout, 'Grass')
+@@ -100,6 +103,8 @@
+                         ramps = slope_layout[int(col)]
+                         sprited = ground_tile(tile_size, [col_index * 32, row_index * 32], ramps)
+                         self.slopesgroup.add(sprited)
++                     #  self.slope.types = ['topslopeleft', 'topsloperight','leftsteep','leftlong','rightsteep','rightlong']
++                     #topsloperight id = 40, topsloperight = 42, left steep = 6, 14 left long = 20,21,29, right steep = 7, 15, rightlong = 22, 23, 30
+ 
+                 col_index += 1
+ 
+@@ -116,16 +121,17 @@
+         self.scroll[0] = int(self.scroll[0])
+         self.scroll[1] = int(self.scroll[1])
+ 
+-    def check_slope_collision(self, player, slopes):
++    def check_slope_collision(self):
+         player = self.player.sprite
+         player.x = player.rect.x
+         player.x += player.movement[0]
+         player.rect.x = int(player.x)
+-        self.collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}
++        #self.collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}
+         for slopes in self.slopesgroup.sprites():
+             if slopes.rect.colliderect(player.rect):
+                 offset = (slopes.rect.left - player.rect.left, slopes.rect.top - player.rect.top)
+-                return self.player_mask.overlap(self.slopes_mask, offset)
++                return player.mask.overlap(slopes.mask, offset)
++        return False
+ 
+ 
+     def collision_movement(self):
+@@ -142,6 +148,29 @@
+                 if player.movement[0] < 0:
+                     player.rect.left = tile.rect.right
+                     self.collision_types['left'] = True
++        for slopes in self.slopesgroup.sprites():
++            TOP, WALKABLE = 0, 1
++            slope_type = TOP
++            if slopes.rect.colliderect(player.rect):
++                if pygame.sprite.collide_mask(player, slopes):
++                    if slopes.rect.top < player.rect.top and slope_type == TOP:
++                        player.rect.top = slopes.rect.bottom
++                        self.player_on_slope = True
++                        player.vertical_momentum = 0
++                    elif player.rect.bottom > slopes.rect.top > player.rect.top and self.player_on_slope == False:
++                        player.rect.bottom = slopes.rect.top
++                        self.player_on_slope = True
++                    elif player.rect.left < slopes.rect.right < player.rect.right and self.player_on_slope == True:
++                        player.rect.bottomleft = slopes.rect.topright
++                        self.player_on_slope = False
++                    elif player.rect.bottomright == slopes.rect.midleft and self.player_on_slope == True:
++                        player.rect.bottomright = slopes.rect.topleft
++                        self.player_on_slope = False
++            else:
++                self.player_on_slope = False
++
++
++
+ 
+         for coin in self.coin.sprites():
+             if coin.rect.colliderect(player.rect):
+@@ -227,3 +256,9 @@
+         self.player.update(self.scroll)
+         self.player.draw(self.surface)
+         self.collision_movement()
++
++ #       collision_types_backup = self.collision_types
++  #      intersection_point = self.check_slope_collision()
++      #  print(intersection_point)
++    #    if intersection_point:
++   #        self.collision_types = collision_types_backup
+Index: ComSciGame-main/main.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import pygame, sys  # import pygame and sys\r\nimport button\r\nfrom level_map import Level\r\nfrom pygame.locals import *  # import pygame modules\r\npygame.init()  # initiate pygame\r\nclock = pygame.time.Clock()  # set up the clock\r\npygame.display.set_caption('Fatal Echo')  # set the window name\r\nSCREEN_WIDTH = 1200\r\nscreen_height = 640\r\n\r\nrescaled_width = 600\r\nrescaled_height = 320\r\n\r\nWINDOW_SIZE = (SCREEN_WIDTH, screen_height)  # set up window size\r\nscreen = pygame.display.set_mode(WINDOW_SIZE, 0, 32)  # initiate screen\r\n\r\ndisplay = pygame.Surface((rescaled_width, rescaled_height))\r\n# define colours\r\nTEXT_COL = (255, 255, 255)\r\nWHITE = (255 , 255, 255)\r\nBGCOLOUR = (0, 128, 255)\r\nPURPLEBG = (85, 0, 149)\r\nLBLUE = (0, 163, 233)\r\n\r\n# load button images\r\nresume_img = pygame.image.load(\"data/graphics/images/button_resume.png\").convert_alpha()\r\noptions_img = pygame.image.load(\"data/graphics/images/button_options.png\").convert_alpha()\r\nquit_img = pygame.image.load(\"data/graphics/images/button_quit.png\").convert_alpha()\r\nvideo_img = pygame.image.load('data/graphics/images/button_video.png').convert_alpha()\r\naudio_img = pygame.image.load('data/graphics/images/button_audio.png').convert_alpha()\r\nkeys_img = pygame.image.load('data/graphics/images/button_keys.png').convert_alpha()\r\neaster_egg_img = pygame.image.load('data/graphics/images/easteregg.png').convert_alpha()\r\nback_img = pygame.image.load('data/graphics/images/button_back.png').convert_alpha()\r\nlogo_img = pygame.image.load('data/graphics/images/fatalecho (1).png').convert()\r\nmini_logo_img = pygame.image.load('data/graphics/images/logosmall.png').convert()\r\nname_logo_img = pygame.image.load('data/graphics/images/namelogo.png').convert()\r\n\r\n# create button instances\r\n#to remember order of function:\r\n#(self, x, y, image, scale)\r\nresume_button = button.Button(SCREEN_WIDTH*1/2 - 100,screen_height * 1/4, resume_img, 1.2)\r\noptions_button = button.Button(SCREEN_WIDTH*1/2 - 100,screen_height * 2/4, options_img, 1.2)\r\nquit_button = button.Button(SCREEN_WIDTH*1/2 - 100,screen_height * 3/4, quit_img, 1.2)\r\nvideo_button = button.Button(SCREEN_WIDTH*1/2 - 100,screen_height * 1/4 - 100, video_img, 1.2)\r\naudio_button = button.Button(SCREEN_WIDTH*1/2 - 100,screen_height * 2/4 - 100, audio_img, 1.2)\r\nkeys_button = button.Button(SCREEN_WIDTH*1/2 - 100,screen_height * 3/4 - 100, keys_img, 1.2)\r\nback_button = button.Button(SCREEN_WIDTH*1/2 - 100,screen_height * 7/8 - 50, back_img, 1.2)\r\neaster_egg_button = button.Button(SCREEN_WIDTH*1/2 - 200,screen_height * 1/5 - 100, easter_egg_img, 1)\r\n\r\n\r\ndef draw_text(text, font, text_col, x, y):\r\n    img = font.render(text, True, text_col)\r\n    screen.blit(img, (x, y))\r\n\r\ndef screen_text(text, fontsize, color, x, y):\r\n    font = pygame.font.SysFont(\"arial\", fontsize)\r\n    text_surface = font.render(text, True, color)\r\n    text_rect = text_surface.get_rect()\r\n    text_rect.midtop = (x, y)\r\n    screen.blit(text_surface, text_rect)\r\ndef logo(img, x, y):\r\n    screen.blit(img, (x,y))\r\nmenu_mode = \"main\"\r\nclicked = False\r\ntime = 2000\r\nscreenswitch = pygame.USEREVENT + 0\r\nfinished_switch = pygame.USEREVENT + 1\r\npygame.time.set_timer(finished_switch, time)\r\npygame.time.set_timer(screenswitch, time)\r\n\r\nlevel = Level([], 'data/levels/level_3/', display)\r\n\r\nRUNNING, PAUSE, TITLESCREEN, STARTSCREEN, ENDSCREEN, EASTEREGG, EEPAUSE = 0, 1, 2, 3, 4, 5, 6\r\nstate = TITLESCREEN\r\nwhile True:\r\n    for e in pygame.event.get():\r\n        if e.type == screenswitch:\r\n            state = STARTSCREEN\r\n        if e.type == finished_switch:\r\n            screenswitch = 0\r\n        if e.type == QUIT:\r\n            pygame.quit()\r\n            sys.exit()\r\n        if e.type == KEYDOWN:\r\n            if e.key == K_SPACE:\r\n                level.button_held()\r\n            if e.key == K_ESCAPE and state == RUNNING:\r\n                state = PAUSE\r\n            if e.key == K_ESCAPE and state == EASTEREGG:\r\n                state = EEPAUSE\r\n            if e.type == KEYUP:\r\n                if e.key == K_SPACE:\r\n                    level.button_released()\r\n            if state == STARTSCREEN:\r\n                if pygame.key.get_pressed():\r\n                    state = RUNNING\r\n        if e.type == pygame.MOUSEBUTTONUP:\r\n            clicked = False\r\n\r\n    else:\r\n        if state == RUNNING:\r\n            display.fill('red')\r\n            level.run()\r\n            screen.blit(pygame.transform.scale(display, WINDOW_SIZE), (0, 0))\r\n            pygame.display.update()  # update the screen\r\n        if state == EASTEREGG:\r\n            display.fill(LBLUE)\r\n            level.run()\r\n            screen.blit(pygame.transform.scale(display, WINDOW_SIZE), (0, 0))\r\n            pygame.display.update()  # update the screen\r\n        elif state == PAUSE:\r\n            screen.fill(PURPLEBG)\r\n            if menu_mode == \"main\":\r\n                # draw pause screen buttons\r\n                if easter_egg_button.draw(screen) and clicked == False:\r\n                    state = EASTEREGG\r\n                    clicked = True\r\n                if resume_button.draw(screen) and clicked == False:\r\n                    state = RUNNING\r\n                    clicked = True\r\n                if options_button.draw(screen) and clicked == False:\r\n                    menu_mode = \"options\"\r\n                    clicked = True\r\n                if quit_button.draw(screen) and clicked == False:\r\n                    pygame.quit()\r\n                    sys.exit()\r\n                    clicked = True\r\n                    # check if the options menu is open\r\n            if menu_mode == \"options\":\r\n                # draw the different options buttons\r\n                if video_button.draw(screen) and clicked == False:\r\n                    print(\"Video Settings\")\r\n                    clicked = True\r\n                if audio_button.draw(screen) and clicked == False:\r\n                    print(\"Audio Settings\")\r\n                    clicked = True\r\n                if keys_button.draw(screen) and clicked == False:\r\n                    clicked = True\r\n                if back_button.draw(screen) and clicked == False:\r\n                    menu_mode = \"main\"\r\n                    clicked = True\r\n        elif state == EEPAUSE:\r\n            screen.fill(PURPLEBG)\r\n            if menu_mode == \"main\":\r\n                # draw pause screen buttons\r\n                if easter_egg_button.draw(screen) and clicked == False:\r\n                    state = RUNNING\r\n                    clicked = True\r\n                if resume_button.draw(screen) and clicked == False:\r\n                    state = EASTEREGG\r\n                    clicked = True\r\n                if options_button.draw(screen) and clicked == False:\r\n                    menu_mode = \"options\"\r\n                    clicked = True\r\n                if quit_button.draw(screen) and clicked == False:\r\n                    pygame.quit()\r\n                    sys.exit()\r\n                    clicked = True\r\n                    # check if the options menu is open\r\n            if menu_mode == \"options\":\r\n                # draw the different options buttons\r\n                if video_button.draw(screen) and clicked == False:\r\n                    print(\"Video Settings\")\r\n                    clicked = True\r\n                if audio_button.draw(screen) and clicked == False:\r\n                    print(\"Audio Settings\")\r\n                    clicked = True\r\n                if keys_button.draw(screen) and clicked == False:\r\n                    clicked = True\r\n                if back_button.draw(screen) and clicked == False:\r\n                    menu_mode = \"main\"\r\n                    clicked = True\r\n        elif state == TITLESCREEN:\r\n            logo(logo_img, 0, 0)\r\n        elif state == STARTSCREEN:\r\n            screen.fill(PURPLEBG)\r\n            logo(mini_logo_img, rescaled_width / 2 + 35, 0)\r\n            screen_text(\"Arrows to move, Space to jump, ESCAPE to pause\", 22, WHITE, SCREEN_WIDTH / 2, screen_height / 2 + 50)\r\n            screen_text(\"Press any key to play\", 22, WHITE, SCREEN_WIDTH / 2, screen_height * 3 / 4 + 20)\r\n        elif state == ENDSCREEN:\r\n            screen.fill(BGCOLOUR)\r\n            screen_text(\"GAME OVER\", 48, WHITE, SCREEN_WIDTH / 2, screen_height / 4)\r\n            screen_text(\"Press any key to play again\", 22, WHITE, SCREEN_WIDTH / 2, screen_height * 3 / 4)\r\n        pygame.display.flip()\r\n\r\n        clock.tick(60)\r\n        continue
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/ComSciGame-main/main.py b/ComSciGame-main/main.py
+--- a/ComSciGame-main/main.py	(revision c375b27411eee050f75599ca26e529edab59e3a2)
++++ b/ComSciGame-main/main.py	(date 1683584642964)
+@@ -62,7 +62,7 @@
+     screen.blit(img, (x,y))
+ menu_mode = "main"
+ clicked = False
+-time = 2000
++time = 3500
+ screenswitch = pygame.USEREVENT + 0
+ finished_switch = pygame.USEREVENT + 1
+ pygame.time.set_timer(finished_switch, time)
+@@ -89,7 +89,7 @@
+             if e.key == K_ESCAPE and state == EASTEREGG:
+                 state = EEPAUSE
+             if e.type == KEYUP:
+-                if e.key == K_SPACE:
++                 if e.key == K_SPACE:
+                     level.button_released()
+             if state == STARTSCREEN:
+                 if pygame.key.get_pressed():
+Index: ComSciGame-main/player.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import pygame, os, math\r\nfrom animation import load_animations\r\n\r\n\r\ndef flip(img, boolean):\r\n    pygame.transform.flip(img, boolean, False)\r\n\r\ndef collision_detection(rect1, rect_list):\r\n    hit_list = []\r\n    for rect in rect_list:\r\n        if rect.colliderect(rect1):\r\n            hit_list.append(rect1)\r\n    return hit_list\r\n\r\nclass Player(pygame.sprite.Sprite):\r\n    def __init__(self, loc):\r\n        super().__init__()\r\n        # player animation\r\n        self.import_animation()\r\n        self.frame = 0\r\n        self.action = ''\r\n        self.change_action('idle')\r\n        self.flip = False\r\n        self.collide_bottom = False\r\n\r\n        self.image = self.animations[self.action][self.anim[self.frame]]\r\n        self.rect = self.image.get_rect(topleft = loc)\r\n\r\n\r\n\r\n        #player movement\r\n        self.x = loc[0]\r\n        self.y = loc[1]\r\n        self.movement = [0, 0]\r\n        self.air_timer = 0\r\n        self.velocity = 0\r\n        self.vertical_momentum = 0\r\n        self.direction = [False, False]\r\n        self.jump_held = False\r\n        self.gravity_multiplier = 0.2\r\n        self.n = 0\r\n\r\n    def get_input(self):\r\n\r\n        self.movement = [0, 0]\r\n        self.keys = pygame.key.get_pressed()\r\n        if self.keys[pygame.K_RIGHT]:\r\n\r\n            self.movement[0] += 3\r\n            self.direction = [True, False]\r\n            self.flip = False\r\n            if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:\r\n                self.movement[0] += 1\r\n        elif self.keys[pygame.K_LEFT]:\r\n            self.movement[0] -= 3\r\n            self.direction = [False, True]\r\n            self.flip = True\r\n            if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:\r\n                self.movement[0] -= 1\r\n        else:\r\n            self.direction = [False, False]\r\n        if self.keys[pygame.K_SPACE]:\r\n            if self.air_timer < 6:\r\n                self.vertical_momentum = -4\r\n\r\n    def gravity(self):\r\n        self.gravity_multiplier = 0.2\r\n        if self.vertical_momentum > 0.4:\r\n            self.gravity_multiplier = 0.5\r\n        elif self.vertical_momentum < 0 and not(self.keys[pygame.K_SPACE]):\r\n            self.vertical_momentum += 1\r\n        self.movement[1] += self.vertical_momentum\r\n        self.vertical_momentum += self.gravity_multiplier\r\n        if self.vertical_momentum > 3:\r\n            self.vertical_momentum = 3\r\n\r\n    def import_animation(self):\r\n        path = 'data/graphics/'\r\n        self.animations = {'idle': [], 'run': [], 'jump': [], 'fall': []}\r\n        animation_data = load_animations(path)\r\n        self.animation_frames = animation_data[0]\r\n        for animation in self.animations.keys():\r\n            self.animations[animation] = animation_data[1]\r\n\r\n\r\n    def flip(self, boolean):\r\n        self.flip = boolean\r\n\r\n    def change_action(self, new_action):\r\n        if self.action == new_action:\r\n            pass\r\n        else:\r\n            self.action = new_action\r\n            self.frame = 0\r\n            self.anim = self.animation_frames[self.action]\r\n\r\n\r\n    def implement_anim(self, loop):\r\n        self.frame += 1\r\n        while self.frame >= len(self.anim):\r\n            if loop:\r\n                self.frame -= len(self.anim)\r\n        image = self.animations[self.action][self.anim[self.frame]]\r\n        self.image = pygame.transform.flip(image, self.flip, False)\r\n\r\n    def status(self):\r\n        if self.movement[1] < 0:\r\n            self.change_action('jump')\r\n        elif self.movement[1] > 1:\r\n            self.change_action('fall')\r\n        else:\r\n            if self.movement[0] == 0:\r\n                self.change_action('idle')\r\n            if self.movement[0] > 0:\r\n                self.change_action('run')\r\n            if self.movement[0] < 0:\r\n                self.change_action('run')\r\n\r\n\r\n\r\n    def update(self, scroll):\r\n        self.get_input()\r\n        # gravity\r\n        self.gravity()\r\n        self.movement[1] += self.vertical_momentum\r\n\r\n\r\n        self.rect.x -= scroll[0]\r\n        self.rect.y -= scroll[1]\r\n\r\n        self.implement_anim(True)\r\n        self.status()\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/ComSciGame-main/player.py b/ComSciGame-main/player.py
+--- a/ComSciGame-main/player.py	(revision c375b27411eee050f75599ca26e529edab59e3a2)
++++ b/ComSciGame-main/player.py	(date 1683560360107)
+@@ -1,7 +1,6 @@
+ import pygame, os, math
+ from animation import load_animations
+ 
+-
+ def flip(img, boolean):
+     pygame.transform.flip(img, boolean, False)
+ 
+@@ -25,8 +24,9 @@
+ 
+         self.image = self.animations[self.action][self.anim[self.frame]]
+         self.rect = self.image.get_rect(topleft = loc)
+-
+-
++        #debugging for slope collisions by pixel
++        self.mask = pygame.mask.from_surface(self.image.convert_alpha())
++        self.DEBUG = False
+ 
+         #player movement
+         self.x = loc[0]
+@@ -44,24 +44,48 @@
+ 
+         self.movement = [0, 0]
+         self.keys = pygame.key.get_pressed()
+-        if self.keys[pygame.K_RIGHT]:
++        if self.keys[pygame.K_d]:
++            self.DEBUG = True
++        if self.keys[pygame.K_f]:
++            self.DEBUG = False
++
++        if self.DEBUG:
++            if self.keys[pygame.K_RIGHT]:
++
++                self.movement[0] += 1
++                self.direction = [True, False]
++                self.flip = False
++
++            elif self.keys[pygame.K_LEFT]:
++                self.movement[0] -= 1
++                self.direction = [False, True]
++                self.flip = True
++
++            if self.keys[pygame.K_UP]:
++                self.movement[1] = -1
++
++            if self.keys[pygame.K_DOWN]:
++                self.movement[1] = 1
++        else:
++            self.keys = pygame.key.get_pressed()
++            if self.keys[pygame.K_RIGHT]:
+ 
+-            self.movement[0] += 3
+-            self.direction = [True, False]
+-            self.flip = False
+-            if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
+-                self.movement[0] += 1
+-        elif self.keys[pygame.K_LEFT]:
+-            self.movement[0] -= 3
+-            self.direction = [False, True]
+-            self.flip = True
+-            if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
+-                self.movement[0] -= 1
+-        else:
+-            self.direction = [False, False]
+-        if self.keys[pygame.K_SPACE]:
+-            if self.air_timer < 6:
+-                self.vertical_momentum = -4
++                self.movement[0] += 3
++                self.direction = [True, False]
++                self.flip = False
++                if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
++                    self.movement[0] += 1
++            elif self.keys[pygame.K_LEFT]:
++                self.movement[0] -= 3
++                self.direction = [False, True]
++                self.flip = True
++                if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
++                    self.movement[0] -= 1
++            else:
++                self.direction = [False, False]
++            if self.keys[pygame.K_SPACE]:
++                if self.air_timer < 6:
++                    self.vertical_momentum = -4
+ 
+     def gravity(self):
+         self.gravity_multiplier = 0.2
+@@ -103,6 +127,7 @@
+         image = self.animations[self.action][self.anim[self.frame]]
+         self.image = pygame.transform.flip(image, self.flip, False)
+ 
++
+     def status(self):
+         if self.movement[1] < 0:
+             self.change_action('jump')
+@@ -121,7 +146,8 @@
+     def update(self, scroll):
+         self.get_input()
+         # gravity
+-        self.gravity()
++        if not self.DEBUG:
++            self.gravity()
+         self.movement[1] += self.vertical_momentum
+ 
+ 
+@@ -129,6 +155,7 @@
+         self.rect.y -= scroll[1]
+ 
+         self.implement_anim(True)
++        self.mask = pygame.mask.from_surface(self.image.convert_alpha())
+         self.status()
+ 
+ 
+Index: ComSciGame-main/collisionDetectionCommit (1).patch
+===================================================================
+diff --git a/ComSciGame-main/collisionDetectionCommit (1).patch b/ComSciGame-main/collisionDetectionCommit (1).patch
+deleted file mode 100644
+--- a/ComSciGame-main/collisionDetectionCommit (1).patch	(revision c375b27411eee050f75599ca26e529edab59e3a2)
++++ /dev/null	(revision c375b27411eee050f75599ca26e529edab59e3a2)
+@@ -1,164 +0,0 @@
+-Index: ComSciGame-main/level_map.py
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+---- ComSciGame-main/level_map.py	(revision 0f99ccfb09ae27e7a4e9397fd69742e120ebbf4b)
+-+++ ComSciGame-main/level_map.py	(revision fede9cd970167d379ebd972c34ac24e4e4228da0)
+-@@ -26,6 +26,7 @@
+-     def __init__(self, size, loc, img):
+-         super().__init__(size, loc)
+-         self.image = img
+-+        self.mask = pygame.mask.from_surface(img)
+- 
+- class Level:
+-     def __init__(self, game_map, path, surface):
+-@@ -116,16 +117,17 @@
+-         self.scroll[0] = int(self.scroll[0])
+-         self.scroll[1] = int(self.scroll[1])
+- 
+--    def check_slope_collision(self, player, slopes):
+-+    def check_slope_collision(self):
+-         player = self.player.sprite
+-         player.x = player.rect.x
+-         player.x += player.movement[0]
+-         player.rect.x = int(player.x)
+--        self.collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}
+-+        #self.collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}
+-         for slopes in self.slopesgroup.sprites():
+-             if slopes.rect.colliderect(player.rect):
+-                 offset = (slopes.rect.left - player.rect.left, slopes.rect.top - player.rect.top)
+--                return self.player_mask.overlap(self.slopes_mask, offset)
+-+                return player.mask.overlap(slopes.mask, offset)
+-+        return False
+- 
+- 
+-     def collision_movement(self):
+-@@ -227,3 +229,10 @@
+-         self.player.update(self.scroll)
+-         self.player.draw(self.surface)
+-         self.collision_movement()
+-+
+-+        #collision_types_backup = self.collision_types
+-+        intersection_point = self.check_slope_collision()
+-+        print("Slope collision check = " + str(intersection_point))
+-+        #if intersection_point:
+-+
+-+        #self.collision_types = collision_types_backup
+-Index: ComSciGame-main/player.py
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+---- ComSciGame-main/player.py	(revision 0f99ccfb09ae27e7a4e9397fd69742e120ebbf4b)
+-+++ ComSciGame-main/player.py	(revision fede9cd970167d379ebd972c34ac24e4e4228da0)
+-@@ -1,7 +1,6 @@
+- import pygame, os, math
+- from animation import load_animations
+- 
+--
+- def flip(img, boolean):
+-     pygame.transform.flip(img, boolean, False)
+- 
+-@@ -26,7 +25,8 @@
+-         self.image = self.animations[self.action][self.anim[self.frame]]
+-         self.rect = self.image.get_rect(topleft = loc)
+- 
+--
+-+        self.mask = pygame.mask.from_surface(self.image.convert_alpha())
+-+        self.DEBUG = False
+- 
+-         #player movement
+-         self.x = loc[0]
+-@@ -44,24 +44,48 @@
+- 
+-         self.movement = [0, 0]
+-         self.keys = pygame.key.get_pressed()
+--        if self.keys[pygame.K_RIGHT]:
+-+        if self.keys[pygame.K_d]:
+-+            self.DEBUG = True
+-+        if self.keys[pygame.K_f]:
+-+            self.DEBUG = False
+-+
+-+        if self.DEBUG:
+-+            if self.keys[pygame.K_RIGHT]:
+-+
+-+                self.movement[0] += 1
+-+                self.direction = [True, False]
+-+                self.flip = False
+-+
+-+            elif self.keys[pygame.K_LEFT]:
+-+                self.movement[0] -= 1
+-+                self.direction = [False, True]
+-+                self.flip = True
+-+
+-+            if self.keys[pygame.K_UP]:
+-+                self.movement[1] = -1
+-+
+-+            if self.keys[pygame.K_DOWN]:
+-+                self.movement[1] = 1
+-+        else:
+-+            self.keys = pygame.key.get_pressed()
+-+            if self.keys[pygame.K_RIGHT]:
+- 
+--            self.movement[0] += 3
+--            self.direction = [True, False]
+--            self.flip = False
+--            if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
+--                self.movement[0] += 1
+--        elif self.keys[pygame.K_LEFT]:
+--            self.movement[0] -= 3
+--            self.direction = [False, True]
+--            self.flip = True
+--            if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
+--                self.movement[0] -= 1
+--        else:
+--            self.direction = [False, False]
+--        if self.keys[pygame.K_SPACE]:
+--            if self.air_timer < 6:
+--                self.vertical_momentum = -4
+-+                self.movement[0] += 3
+-+                self.direction = [True, False]
+-+                self.flip = False
+-+                if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
+-+                    self.movement[0] += 1
+-+            elif self.keys[pygame.K_LEFT]:
+-+                self.movement[0] -= 3
+-+                self.direction = [False, True]
+-+                self.flip = True
+-+                if -0.2 < self.vertical_momentum < 0.2 and self.keys[pygame.K_SPACE]:
+-+                    self.movement[0] -= 1
+-+            else:
+-+                self.direction = [False, False]
+-+            if self.keys[pygame.K_SPACE]:
+-+                if self.air_timer < 6:
+-+                    self.vertical_momentum = -4
+- 
+-     def gravity(self):
+-         self.gravity_multiplier = 0.2
+-@@ -103,6 +127,7 @@
+-         image = self.animations[self.action][self.anim[self.frame]]
+-         self.image = pygame.transform.flip(image, self.flip, False)
+- 
+-+
+-     def status(self):
+-         if self.movement[1] < 0:
+-             self.change_action('jump')
+-@@ -121,7 +146,8 @@
+-     def update(self, scroll):
+-         self.get_input()
+-         # gravity
+--        self.gravity()
+-+        if not self.DEBUG:
+-+            self.gravity()
+-         self.movement[1] += self.vertical_momentum
+- 
+- 
+-@@ -129,6 +155,7 @@
+-         self.rect.y -= scroll[1]
+- 
+-         self.implement_anim(True)
+-+        self.mask = pygame.mask.from_surface(self.image.convert_alpha())
+-         self.status()
+- 
+- 
+Index: .idea/.gitignore
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/.gitignore b/.idea/.gitignore
+new file mode 100644
+--- /dev/null	(date 1683553463210)
++++ b/.idea/.gitignore	(date 1683553463210)
+@@ -0,0 +1,3 @@
++# Default ignored files
++/shelf/
++/workspace.xml
+Index: .idea/inspectionProfiles/Project_Default.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/inspectionProfiles/Project_Default.xml b/.idea/inspectionProfiles/Project_Default.xml
+new file mode 100644
+--- /dev/null	(date 1683553447462)
++++ b/.idea/inspectionProfiles/Project_Default.xml	(date 1683553447462)
+@@ -0,0 +1,6 @@
++<component name="InspectionProjectProfileManager">
++  <profile version="1.0">
++    <option name="myName" value="Project Default" />
++    <inspection_tool class="PyUnreachableCodeInspection" enabled="false" level="WARNING" enabled_by_default="false" />
++  </profile>
++</component>
+\ No newline at end of file
+Index: .idea/PygameProject.iml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/PygameProject.iml b/.idea/PygameProject.iml
+new file mode 100644
+--- /dev/null	(date 1683553447527)
++++ b/.idea/PygameProject.iml	(date 1683553447527)
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<module type="PYTHON_MODULE" version="4">
++  <component name="NewModuleRootManager">
++    <content url="file://$MODULE_DIR$" />
++    <orderEntry type="inheritedJdk" />
++    <orderEntry type="sourceFolder" forTests="false" />
++  </component>
++</module>
+\ No newline at end of file
+Index: .idea/modules.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/modules.xml b/.idea/modules.xml
+new file mode 100644
+--- /dev/null	(date 1683553447541)
++++ b/.idea/modules.xml	(date 1683553447541)
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="ProjectModuleManager">
++    <modules>
++      <module fileurl="file://$PROJECT_DIR$/.idea/PygameProject.iml" filepath="$PROJECT_DIR$/.idea/PygameProject.iml" />
++    </modules>
++  </component>
++</project>
+\ No newline at end of file
+Index: .idea/misc.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/misc.xml b/.idea/misc.xml
+new file mode 100644
+--- /dev/null	(date 1683553447572)
++++ b/.idea/misc.xml	(date 1683553447572)
+@@ -0,0 +1,4 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.9" project-jdk-type="Python SDK" />
++</project>
+\ No newline at end of file
+Index: .idea/inspectionProfiles/profiles_settings.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/inspectionProfiles/profiles_settings.xml b/.idea/inspectionProfiles/profiles_settings.xml
+new file mode 100644
+--- /dev/null	(date 1683553447586)
++++ b/.idea/inspectionProfiles/profiles_settings.xml	(date 1683553447586)
+@@ -0,0 +1,6 @@
++<component name="InspectionProjectProfileManager">
++  <settings>
++    <option name="USE_PROJECT_PROFILE" value="false" />
++    <version value="1.0" />
++  </settings>
++</component>
+\ No newline at end of file
+Index: .idea/vcs.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/vcs.xml b/.idea/vcs.xml
+new file mode 100644
+--- /dev/null	(date 1683553447604)
++++ b/.idea/vcs.xml	(date 1683553447604)
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="VcsDirectoryMappings">
++    <mapping directory="" vcs="Git" />
++  </component>
++</project>
+\ No newline at end of file

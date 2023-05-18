@@ -1,0 +1,14 @@
+<changelist name="Uncommitted_changes_before_Update_at_2023-05-17_10_29_p_m__[Changes]" date="1684376994829" recycled="false" toDelete="true">
+  <option name="PATH" value="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_2023-05-17_10_29_p_m__[Changes]/shelved.patch" />
+  <option name="DESCRIPTION" value="Uncommitted changes before Update at 2023-05-17 10:29 p.m. [Changes]" />
+  <binary>
+    <option name="BEFORE_PATH" value="ComSciGame-main/data/graphics/Terrain/Grass/Grass.png" />
+    <option name="AFTER_PATH" />
+    <option name="SHELVED_PATH" />
+  </binary>
+  <binary>
+    <option name="BEFORE_PATH" value="ComSciGame-main/data/graphics/Terrain/Slopes/Slopes.png" />
+    <option name="AFTER_PATH" value="ComSciGame-main/data/graphics/Terrain/Slopes/Slopes.png" />
+    <option name="SHELVED_PATH" value="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_2023-05-17_10_29_p_m__[Changes]/Slopes.png" />
+  </binary>
+</changelist>
